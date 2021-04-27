@@ -1,0 +1,96 @@
+---
+title: "Telecom users dataset"
+author: Kornel Olszewski
+output:
+html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+This project aims to provide model for data described in https://www.kaggle.com/radmirzosimov/telecom-users-dataset
+
+# Environment setup
+
+```{r}
+library(tidyverse)
+library(mlr3verse)
+library(here)
+library(vroom)
+library(skimr)
+library(DataExplorer)
+```
+
+# Data import
+
+```{r}
+tab = here("telecom-users-dataset","archive.zip") %>% vroom()
+```
+
+# Overview of data
+
+```{r}
+tab %>% glimpse()
+```
+
+
+```{r}
+tab %>% skim()
+```
+The dataset consists of 17 character variables and 5 numeric variables. Out of them: *Churn* is the dependent variable and *customerID* is a case label, which will be skipped in computation. There is one variable - *TotalCharges* - which has missing values. Let's see what can be understood from data exploration.
+
+# Initial data exploration
+
+```{r, fig.width=14, fig.height=12}
+plot_bar(tab, by = "Churn")
+```
+
+Upon first look it seems that there are little to no differences in distribution of dependent variable against *gender* and *Phone Service* within discrete variables. 
+
+```{r, fig.width=12, fig.height=6}
+tab %>% select(.,MonthlyCharges,tenure,TotalCharges) %>% plot_histogram()
+```
+
+*TotalCharges* seems to have lognormal distribution. Lets apply a *log* transformation and see what happens:
+
+```{r, fig.width=12, fig.height=6}
+tab %>% 
+  select(.,TotalCharges) %>% 
+  transmute(.,l_TotalCharges = log(TotalCharges + 1)) %>%
+  plot_histogram()
+```
+
+The distribution is not quite similar to normal one, but looks better than the original. Let's check if there is correlation between independent variables:
+
+```{r, fig.width=12, fig.height=12}
+tab %>%
+  mutate(.,l_TotalCharges = log(TotalCharges + 1)) %>%
+  select(.,-c("...1", "Churn", "TotalCharges")) %>%
+  na.omit() %>%
+  plot_correlation(., type = "c")
+```
+
+Looks like *Tenure* and *l_TotalCharges* on one hand, and *MonthlyCharges* with *l_TotalCharges* are correlated. During modeling  it will be worthwhile to apply Principal Component Analysis to those pairs of variables. Let's see what it might look like:
+
+```{r}
+tab %>%
+  mutate(.,l_TotalCharges = log(TotalCharges + 1)) %>%
+  select(.,tenure,l_TotalCharges) %>%
+  na.omit() %>%
+  plot_prcomp()
+```
+
+```{r}
+tab %>%
+  mutate(.,l_TotalCharges = log(TotalCharges + 1)) %>%
+  select(.,MonthlyCharges,l_TotalCharges) %>%
+  na.omit() %>%
+  plot_prcomp()
+```
+
+In case of the first pair one principal component based on two selected columns explains 92% of variance while with the second pair: 79%. 
+
+# Initial modelling preparation
+
+
+
